@@ -1,0 +1,107 @@
+pipeline{
+      environment{
+        IMAGE_NAME =  sh(returnStdout: true,script: 'echo $image_name').trim()
+        ORIGIN_URL =  sh(returnStdout: true,script: 'echo $origin_url').trim()
+        GIR_ORIGIN_REPO =  sh(returnStdout: true,script: 'echo $git_origin_repo').trim()
+        BANCH =  sh(returnStdout: true,script: 'echo $branch').trim()
+        NEW_BANCH = sh(returnStdout: true,script: 'echo $branch').trim().replace("/", ".")
+      }
+
+      agent{
+        node{
+          label 'slave-pipeline-maven'
+        }
+      }
+
+      stages{
+        // 定义第一个stage， 完成克隆源码的任务
+        stage('Git'){
+          steps{
+            script{
+            git branch: 'master', credentialsId: '086da3b7-bb65-40c4-ae64-8b06770f7f3f', url: 'http://root:12345678@${ORIGIN_URL}'
+            
+            pro_output2 = sh(returnStdout: true, script: 'echo $project')
+            if (pro_output2.contains("gradle")) {
+            //sleep 180
+            sh "cp `pwd`/ci/Dockerfile /home/jenkins/workspace/"
+            sh "cp `pwd`/ci/startup.sh /home/jenkins/workspace/"
+              }
+            else{
+            sh "cp `pwd`/ci/Dockerfile /home/jenkins/workspace/"
+            sh "cp `pwd`/ci/startup.sh /home/jenkins/workspace/"
+              }
+            git branch: "${BANCH}", credentialsId: '086da3b7-bb65-40c4-ae64-8b06770f7f3f', url: 'http://root:12345678@${git_origin_repo}'
+                  }
+          }
+        }
+
+        // 添加第二个stage， 运行源码打包命令
+        stage('Package'){
+          steps{
+            script{
+                  pro_output = sh(returnStdout: true, script: 'echo $project')
+                  if (pro_output.contains("gradle")) {
+                      echo "正在构建gradle项目"
+                      container("gradle") {
+                  sh "rm -rf /root/.gradle"
+                  sh "gradle clean :${IMAGE_NAME}:build -x test"
+              }
+                  }else{
+                  container("maven") {
+                  //sh "sleep 200"
+                  sh "mvn install -N & mvn install"
+                  sh "mvn clean"
+                  sh "mvn package -B -DskipTests"
+
+              }
+                  }
+
+          }
+         }
+        }
+
+         // 添加第四个stage, 运行容器镜像构建和推送命令， 用到了environment中定义的groovy环境变量
+          stage('Image Build And Publish'){
+            steps{
+                script{
+                def MAIN_OLD_TAG = sh(returnStdout: true,script: 'echo `curl -s http://dockerutils:8080/image/query?name=$image_name-$branch|cut -d . -f 1`')
+                def SUB_OLD_TAG = sh(returnStdout: true,script: 'echo `curl -s http://dockerutils:8080/image/query?name=$image_name-$branch|cut -d . -f 2`')
+                def t_SUBVER =  sh(returnStdout: true,script: "SUB_OLD_TAG=${SUB_OLD_TAG}" + 'echo `expr ${SUB_OLD_TAG} + 1`').trim()
+                def IMAGE_TAG =  sh(returnStdout: true,script: "t_SUBVER=${t_SUBVER};" + 'echo ${NEW_BANCH}-${t_SUBVER}').trim()
+                pro_output1 = sh(returnStdout: true, script: 'echo $project')
+                if (pro_output1.contains("gradle")) {
+                    container("kaniko") {
+                    sh "cp /home/jenkins/workspace/Dockerfile `pwd`"
+                    sh "cp /home/jenkins/workspace/startup.sh `pwd`"
+                    //sh "sleep 80"
+                    sh "IMAGE_NAME=${IMAGE_NAME};" + "cp `pwd`/${IMAGE_NAME}/build/libs/*.jar `pwd`/${IMAGE_NAME}/build/libs/app.jar"
+                    sh "IMAGE_NAME=${IMAGE_NAME};" + "sed -i 's/IMAGE_NAME/${IMAGE_NAME}/g' `pwd`/Dockerfile"
+                    sh "IMAGE_NAME=${IMAGE_NAME};IMAGE_TAG=${IMAGE_TAG};" + "kaniko -f `pwd`/Dockerfile -c `pwd` --destination=registry-vpc.cn-beijing.aliyuncs.com/jiajiakang/${IMAGE_NAME}:${IMAGE_TAG}"
+                    sh "IMAGE_NAME=${IMAGE_NAME};" + "curl -s http://dockerutils:8080/image/inc?name=${IMAGE_NAME}-$branch"
+                   }
+              }
+                  else{
+                 container("kaniko") {
+                    sh "cp /home/jenkins/workspace/Dockerfile `pwd`"
+                    sh "mkdir -p $image_name/build/libs"
+                    sh "cp /home/jenkins/workspace/startup.sh `pwd`"
+                    sh "IMAGE_NAME=${IMAGE_NAME};" + "cp `pwd`/$image_name/target/*.jar `pwd`/$image_name/build/libs/app.jar"
+                    //sh "sleep 80"
+                    sh "IMAGE_NAME=${IMAGE_NAME};" + "sed -i 's/IMAGE_NAME/${IMAGE_NAME}/g' `pwd`/Dockerfile"
+                    sh "IMAGE_NAME=${IMAGE_NAME};IMAGE_TAG=${IMAGE_TAG};" + "kaniko -f `pwd`/Dockerfile -c `pwd` --destination=registry-vpc.cn-beijing.aliyuncs.com/jiajiakang/${IMAGE_NAME}:${IMAGE_TAG}"
+                    sh "IMAGE_NAME=${IMAGE_NAME};NEW_BANCH=${NEW_BANCH};" + "curl -s http://dockerutils:8080/image/inc?name=${IMAGE_NAME}-$branch"
+                 }
+                  }
+                 
+                 }
+             }
+          }
+
+             
+
+
+
+
+
+      }
+    }
