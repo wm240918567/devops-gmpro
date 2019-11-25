@@ -36,6 +36,9 @@ spec:
         env:
         - name: APP_ENV
           value: ${IMAGE_ENV}
+        - name: IMAGE_TAG
+          value: ${IMAGE_TAG}
+
         - name: aliyun_logs_${IMAGE_NAME}-${IMAGE_ENV}
           value: /var/log/stdout.log
         volumeMounts:
