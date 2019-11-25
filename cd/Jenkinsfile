@@ -16,11 +16,11 @@ pipeline{
 
       stages{
 
-        stage('Git'){
-          steps{
-            git branch: 'master', credentialsId: '086da3b7-bb65-40c4-ae64-8b06770f7f3f', url: 'http://root:12345678@gitlab.haoyuanyiliao.com/ceshi/gmpro.git'
-          }
-        }
+        // stage('Git'){
+        //   steps{
+        //     git branch: 'master', credentialsId: '086da3b7-bb65-40c4-ae64-8b06770f7f3f', url: 'http://root:12345678@gitlab.haoyuanyiliao.com/ceshi/gmpro.git'
+        //   }
+        // }
          //部署应用到Kubernetes集群
          stage('Deploy'){
             steps{
