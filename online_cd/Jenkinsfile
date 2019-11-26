@@ -36,7 +36,7 @@ pipeline{
                      //sh "sed -i 's/IMAGE_ENV/${IMAGE_ENV}/g' `pwd`/cd/deployment.yaml"
                      step([$class: 'KubernetesDeploy', authMethod: 'certs', apiServerUrl: 'https://172.16.0.155:6443', credentialsId:'onlinek8sCertAuth', config: 'online_cd/deployment.yaml',variableState: 'IMAGE_TAG,IMAGE_NAME,REPLICAS,IMAGE_ENV,HEALTH_PATH'])
                  for(i=1;i<=4;i++){
-                  sleep 20
+                  sleep 60
                   server_output = sh(returnStdout: true, script: 'timeout -t 10 kubectl rollout status deployment ${image_name}-${image_env} || echo "error"')
                   if (server_output.contains("successfully")) {
                       break
