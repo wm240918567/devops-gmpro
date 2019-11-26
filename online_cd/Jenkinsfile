@@ -5,6 +5,7 @@ pipeline{
         IMAGE_TAG =  sh(returnStdout: true,script: 'echo $image_tag').trim()
         REPLICAS =  sh(returnStdout: true,script: 'echo $replicas').trim()
         IMAGE_ENV =  sh(returnStdout: true,script: 'echo $image_env').trim()
+        HEALTH_PATH =  sh(returnStdout: true,script: 'echo $health_path').trim()
         //PRO_NAME =  sh(returnStdout: true,script: 'echo $pro_name').trim()
       }
 
@@ -33,7 +34,7 @@ pipeline{
                      sh "kubectl get pods"
                      //sleep 500
                      //sh "sed -i 's/IMAGE_ENV/${IMAGE_ENV}/g' `pwd`/cd/deployment.yaml"
-                     step([$class: 'KubernetesDeploy', authMethod: 'certs', apiServerUrl: 'https://172.16.0.155:6443', credentialsId:'onlinek8sCertAuth', config: 'online_cd/deployment.yaml',variableState: 'IMAGE_TAG,IMAGE_NAME,REPLICAS,IMAGE_ENV'])
+                     step([$class: 'KubernetesDeploy', authMethod: 'certs', apiServerUrl: 'https://172.16.0.155:6443', credentialsId:'onlinek8sCertAuth', config: 'online_cd/deployment.yaml',variableState: 'IMAGE_TAG,IMAGE_NAME,REPLICAS,IMAGE_ENV,HEALTH_PATH'])
                  for(i=1;i<=4;i++){
                   sleep 20
                   server_output = sh(returnStdout: true, script: 'timeout -t 10 kubectl rollout status deployment ${image_name}-${image_env} || echo "error"')
