@@ -51,7 +51,8 @@ pipeline{
                   //sh "sleep 200"
                   sh "mvn install -N & mvn install"
                   sh "mvn clean"
-                  sh "mvn package -B -DskipTests"
+                  sh "mvn package -pl ${IMAGE_NAME} -am -B -DskipTests"
+                //   sh "mvn package -B -DskipTests"
 
               }
                   }
