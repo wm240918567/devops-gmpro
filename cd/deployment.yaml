@@ -39,8 +39,8 @@ spec:
           value: ${IMAGE_ENV}
         - name: IMAGE_TAG
           value: ${IMAGE_TAG}
-        - name: LOG_STORE_${IMAGE_NAME}-${IMAGE_ENV}
-          value: 'true'
+        # - name: LOG_STORE_${IMAGE_NAME}-${IMAGE_ENV}
+        #   value: 'true'
         # - name: aliyun_logs_${IMAGE_NAME}-${IMAGE_ENV}
         #   value: /var/log/stdout.log
         volumeMounts:
