@@ -67,6 +67,7 @@ pipeline{
                         body: """<p>发布失败: ${image_name}_${image_tag} :</p>
                     <p>Check console output </a>"</p>""",
                     )
+                    throw new Exception("发布失败，已回滚");
         
                         }
                  }
