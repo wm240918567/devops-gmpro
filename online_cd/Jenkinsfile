@@ -48,7 +48,7 @@ pipeline{
                         if (apply_output.contains("successfully")) {
                     emailext (
                         mimeType: 'text/html',
-                        subject: "发布成功",
+                        subject: """${image_name}_${image_tag}_${IMAGE_ENV}发布成功""",
                         to: "$mail",
                         body: """<p>SUCCESS: ${image_name}_${image_tag} :</p>
                     <p>Check console output </a>"</p>""",
@@ -64,7 +64,7 @@ pipeline{
                             echo rollback_output
                     emailext (
                         mimeType: 'text/html',
-                        subject: "发布失败，已回滚，请注意查看",
+                        subject: """${image_name}_${image_tag}_${IMAGE_ENV}发布失败，已回滚""",
                         to: "$mail",
                         body: """<p>发布失败: ${image_name}_${image_tag} :</p>
                     <p>Check console output </a>"</p>""",
