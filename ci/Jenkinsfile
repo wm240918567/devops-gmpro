@@ -48,7 +48,7 @@ pipeline{
               }
                   }else{
                   container("maven") {
-                  sh "sleep 100"
+                //   sh "sleep 100"
                   sh "mvn install -N & mvn install"
                   sh "mvn clean"
                   sh "mvn package -pl ${IMAGE_NAME} -am -B -DskipTests"
