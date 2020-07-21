@@ -1,5 +1,5 @@
 pipeline{
-      environment{
+    environment{
         //IMAGE_NAME =  sh(returnStdout: true,script: 'echo `echo $git_origin_repo|cut -d / -f 3|cut -d . -f 1`').trim()
         IMAGE_NAME =  sh(returnStdout: true,script: 'echo $image_name').trim()
         IMAGE_TAG =  sh(returnStdout: true,script: 'echo $image_tag').trim()
@@ -7,35 +7,15 @@ pipeline{
         IMAGE_ENV =  sh(returnStdout: true,script: 'echo $image_env').trim()
         HEALTH_PATH =  sh(returnStdout: true,script: 'echo $health_path').trim()
         //PRO_NAME =  sh(returnStdout: true,script: 'echo $pro_name').trim()
-      }
+    }
 
-      agent{
+    agent{
         node{
-          label 'slave-pipeline-online'
+            label 'slave-pipeline-online'
         }
-      }
+    }
 
-      stages{
-          
-          stage('git'){
-              steps{
-                  script{
-                      echo "开始合并代码到master"
-                      def autoMergeRes = sh(returnStdout: true,script: 'echo `curl -s http://dockerutils:8080/merge?imageName=${image_name}\\&imageTag=${image_tag}\\&env=${image_env}`')
-                      if(autoMergeRes.trim().equals('success')){
-                          echo "合并合并成功，继续发版"
-                      }else{
-                          emailext (
-                            mimeType: 'text/html',
-                            subject: """${image_name}_${image_tag}_${IMAGE_ENV}代码合并失败，未发版""",
-                            to: "$mail",
-                            body: """<p>代码合并失败:${image_name}_${image_tag}_${IMAGE_ENV}""",
-                          )
-                          throw new Exception("合并代码失败，异常信息:"+autoMergeRes+",请检查后再重试");
-                      }
-                  }
-              }
-          }
+    stages{
 
         // stage('Git'){
         //   steps{
@@ -43,64 +23,68 @@ pipeline{
         //   }
         // }
          //部署应用到Kubernetes集群
-         stage('Deploy'){
+        stage('Deploy'){
             steps{
-
-              script{
-              container("kubectl") {
-                     echo "Building..${IMAGE_ENV}"
-                     sh "kubectl get pods"
-                     sh "cp /usr/local/config ~/.kube/"
-                     sh "kubectl get pods"
-                     //sleep 500
-                     //sh "sed -i 's/IMAGE_ENV/${IMAGE_ENV}/g' `pwd`/cd/deployment.yaml"
-                     step([$class: 'KubernetesDeploy', authMethod: 'certs', apiServerUrl: 'https://172.16.0.155:6443', credentialsId:'onlinek8sCertAuth', config: 'online_cd/deployment.yaml',variableState: 'IMAGE_TAG,IMAGE_NAME,REPLICAS,IMAGE_ENV,HEALTH_PATH'])
-                 for(i=1;i<=4;i++){
-                  sleep 20
-                  server_output = sh(returnStdout: true, script: 'timeout -t 10 kubectl rollout status deployment ${image_name}-${image_env} || echo "error"')
-                  if (server_output.contains("successfully")) {
-                      break
-                  }else{
-                      echo "重试中${i}"
-                  }
-                  }
-                 apply_output = sh(returnStdout: true, script: 'timeout -t 10 kubectl rollout status deployment ${image_name}-${image_env} || echo "error"')
+                script{
+                    container("kubectl") {
+                        echo "Building..${IMAGE_ENV}"
+                        sh "kubectl get pods"
+                        sh "cp /usr/local/config ~/.kube/"
+                        sh "kubectl get pods"
+                        //sleep 500
+                        //sh "sed -i 's/IMAGE_ENV/${IMAGE_ENV}/g' `pwd`/cd/deployment.yaml"
+                        step([$class: 'KubernetesDeploy', authMethod: 'certs', apiServerUrl: 'https://172.16.0.155:6443', credentialsId:'onlinek8sCertAuth', config: 'online_cd/deployment.yaml',variableState: 'IMAGE_TAG,IMAGE_NAME,REPLICAS,IMAGE_ENV,HEALTH_PATH'])
+                        for(i=1;i<=4;i++){
+                            sleep 20
+                            server_output = sh(returnStdout: true, script: 'timeout -t 10 kubectl rollout status deployment ${image_name}-${image_env} || echo "error"')
+                            if (server_output.contains("successfully")) {
+                                break
+                            }else{
+                                echo "重试中${i}"
+                            }
+                        }
+                        apply_output = sh(returnStdout: true, script: 'timeout -t 10 kubectl rollout status deployment ${image_name}-${image_env} || echo "error"')
                         if (apply_output.contains("successfully")) {
-                    emailext (
-                        mimeType: 'text/html',
-                        subject: """${image_name}_${image_tag}_${IMAGE_ENV}发布成功""",
-                        to: "$mail",
-                        body: """<p>SUCCESS: ${image_name}_${image_tag} :</p>
-                    <p>Check console output </a>"</p>""",
-                    )
-
-                    //return
+                            echo "发版成功，开始合并代码到master"
+                            def autoMergeRes = sh(returnStdout: true,script: 'echo `curl -s http://dockerutils:8080/merge?imageName=${image_name}\\&imageTag=${image_tag}\\&env=${image_env}`')
+                            if (autoMergeRes.trim().equals('success')) {
+                                echo "分支合并成功"
+                                emailext (
+                                    mimeType: 'text/html',
+                                    subject: """${image_name}_${image_tag}_${IMAGE_ENV}发布、合并成功""",
+                                    to: "$mail",
+                                    body: """<p>SUCCESS: ${image_name}_${image_tag}_${IMAGE_ENV}</p>""",
+                                )
+                            } else {
+                                echo "分支合并失败"
+                                emailext (
+                                    mimeType: 'text/html',
+                                    subject: """${image_name}_${image_tag}_${IMAGE_ENV}发布成功、代码合并失败""",
+                                    to: "$mail",
+                                    body: """<p>dSUCCESS: ${image_name}_${image_tag}_${IMAGE_ENV}</p>""",
+                                )
+                            }
+                            //return
                         } else {
                             echo "error"
-                           rollback_output = sh(returnStdout: true, script: "kubectl rollout undo deployment ${IMAGE_NAME}-${IMAGE_ENV}")
+                            rollback_output = sh(returnStdout: true, script: "kubectl rollout undo deployment ${IMAGE_NAME}-${IMAGE_ENV}")
                             //deploy_msg =  deploy_msg + ", 应用已回滚"
                             //echo deploy_msg
                             echo "应用已回滚"
                             echo rollback_output
-                    emailext (
-                        mimeType: 'text/html',
-                        subject: """${image_name}_${image_tag}_${IMAGE_ENV}发布失败，已回滚""",
-                        to: "$mail",
-                        body: """<p>发布失败: ${image_name}_${image_tag} :</p>
-                    <p>Check console output </a>"</p>""",
-                    )
-                    throw new Exception("发布失败，已回滚");
+                            emailext (
+                                mimeType: 'text/html',
+                                subject: """${image_name}_${image_tag}_${IMAGE_ENV}发布失败，已回滚""",
+                                to: "$mail",
+                                body: """<p>发布失败: ${image_name}_${image_tag} :</p>
+                            <p>Check console output </a>"</p>""",
+                            )
+                            throw new Exception("发布失败，已回滚");
                             //echo "on"
-
                         }
-                 }
-              }
-
-          }
-
-
-}
-
-
-      }
+                    }
+                }
+            }
+        }
     }
+}
