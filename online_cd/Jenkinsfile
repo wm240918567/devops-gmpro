@@ -21,7 +21,7 @@ pipeline{
               steps{
                   script{
                       echo "开始合并代码到master"
-                      def autoMergeRes = sh(returnStdout: true,script: 'echo `curl -s http://dockerutils:8080/merge?imageName=${image_name}&imageTag=${image_tag}&env=${iamge_env}`')
+                      def autoMergeRes = sh(returnStdout: true,script: 'echo `curl -s http://dockerutils:8080/merge?imageName=${image_name}\&imageTag=${image_tag}\&env=${iamge_env}`')
                       if(autoMergeRes.equal('success')){
                           echo "合并合并成功，继续发版"
                       }else{
