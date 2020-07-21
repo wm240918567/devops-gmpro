@@ -1,12 +1,10 @@
 pipeline{
     environment{
-        //IMAGE_NAME =  sh(returnStdout: true,script: 'echo `echo $git_origin_repo|cut -d / -f 3|cut -d . -f 1`').trim()
         IMAGE_NAME =  sh(returnStdout: true,script: 'echo $image_name').trim()
         IMAGE_TAG =  sh(returnStdout: true,script: 'echo $image_tag').trim()
         REPLICAS =  sh(returnStdout: true,script: 'echo $replicas').trim()
         IMAGE_ENV =  sh(returnStdout: true,script: 'echo $image_env').trim()
         HEALTH_PATH =  sh(returnStdout: true,script: 'echo $health_path').trim()
-        //PRO_NAME =  sh(returnStdout: true,script: 'echo $pro_name').trim()
     }
 
     agent{
@@ -16,12 +14,6 @@ pipeline{
     }
 
     stages{
-
-        // stage('Git'){
-        //   steps{
-        //     git branch: 'master', credentialsId: '086da3b7-bb65-40c4-ae64-8b06770f7f3f', url: 'http://root:12345678@gitlab.haoyuanyiliao.com/ceshi/gmpro.git'
-        //   }
-        // }
          //部署应用到Kubernetes集群
         stage('Deploy'){
             steps{
@@ -45,43 +37,48 @@ pipeline{
                         }
                         apply_output = sh(returnStdout: true, script: 'timeout -t 10 kubectl rollout status deployment ${image_name}-${image_env} || echo "error"')
                         if (apply_output.contains("successfully")) {
-                            echo "发版成功，开始合并代码到master"
-                            def autoMergeRes = sh(returnStdout: true,script: 'echo `curl -s http://dockerutils:8080/merge?imageName=${image_name}\\&imageTag=${image_tag}\\&env=${image_env}`')
-                            if (autoMergeRes.trim().equals('success')) {
-                                echo "分支合并成功"
-                                emailext (
-                                    mimeType: 'text/html',
-                                    subject: """${image_name}_${image_tag}_${IMAGE_ENV}发布、合并成功""",
-                                    to: "$mail",
-                                    body: """<p>SUCCESS: ${image_name}_${image_tag}_${IMAGE_ENV}</p>""",
-                                )
-                            } else {
-                                echo "分支合并失败"
-                                emailext (
-                                    mimeType: 'text/html',
-                                    subject: """${image_name}_${image_tag}_${IMAGE_ENV}发布成功、代码合并失败""",
-                                    to: "$mail",
-                                    body: """<p>dSUCCESS: ${image_name}_${image_tag}_${IMAGE_ENV}</p>""",
-                                )
-                            }
-                            //return
+                            echo "应用发版成功"
                         } else {
-                            echo "error"
+                            echo "应用发版失败，准备回滚"
                             rollback_output = sh(returnStdout: true, script: "kubectl rollout undo deployment ${IMAGE_NAME}-${IMAGE_ENV}")
-                            //deploy_msg =  deploy_msg + ", 应用已回滚"
-                            //echo deploy_msg
-                            echo "应用已回滚"
+                            echo "应用已回滚，发送邮件通知"
                             echo rollback_output
                             emailext (
                                 mimeType: 'text/html',
                                 subject: """${image_name}_${image_tag}_${IMAGE_ENV}发布失败，已回滚""",
                                 to: "$mail",
-                                body: """<p>发布失败: ${image_name}_${image_tag} :</p>
+                                body: """<p>发布失败:${image_name}_${image_tag}_${IMAGE_ENV}:</p>
                             <p>Check console output </a>"</p>""",
                             )
                             throw new Exception("发布失败，已回滚");
-                            //echo "on"
                         }
+                    }
+                }
+            }
+        }
+        
+        stage('Auto-Merge'){
+            steps{
+                script{
+                    def autoMergeRes = sh(returnStdout: true,script: 'echo `curl -s http://dockerutils:8080/merge?imageName=${image_name}\\&imageTag=${image_tag}\\&env=${image_env}`')
+                    if (autoMergeRes.trim().equals('success')) {
+                        echo "分支合并成功"
+                        emailext (
+                            mimeType: 'text/html',
+                            subject: """${image_name}_${image_tag}_${IMAGE_ENV}发布、合并成功""",
+                            to: "$mail",
+                            body: """<p>SUCCESS:${image_name}_${image_tag}_${IMAGE_ENV}</p>""",
+                        )
+                    } else {
+                        def str = "发版成功但分支自动合并master失败，原因：${autoMergeRes}，请管理员务必手动合并代码！"
+                        echo str
+                        emailext (
+                            mimeType: 'text/html',
+                            subject: """${image_name}_${image_tag}_${IMAGE_ENV}发布成功、代码合并失败""",
+                            to: "$mail",
+                            body: """<p>${str}</p>""",
+                        )
+                        throw new Exception(str);
                     }
                 }
             }
