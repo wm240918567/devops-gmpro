@@ -25,7 +25,13 @@ pipeline{
                       if(autoMergeRes.trim().equals('success')){
                           echo "合并合并成功，继续发版"
                       }else{
-                          throw new Exception("合并代码失败:"+autoMergeRes+",请检查后再重试");
+                          emailext (
+                            mimeType: 'text/html',
+                            subject: """${image_name}_${image_tag}_${IMAGE_ENV}代码合并失败，未发版""",
+                            to: "$mail",
+                            body: """<p>代码合并失败:${image_name}_${image_tag}_${IMAGE_ENV}""",
+                          )
+                          throw new Exception("合并代码失败，异常信息:"+autoMergeRes+",请检查后再重试");
                       }
                   }
               }
