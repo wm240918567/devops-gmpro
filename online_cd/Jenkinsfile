@@ -22,7 +22,7 @@ pipeline{
                   script{
                       echo "开始合并代码到master"
                       def autoMergeRes = sh(returnStdout: true,script: 'echo `curl -s http://dockerutils:8080/merge?imageName=${image_name}\\&imageTag=${image_tag}\\&env=${image_env}`')
-                      if(autoMergeRes.equals('success')){
+                      if(autoMergeRes.trim().equals('success')){
                           echo "合并合并成功，继续发版"
                       }else{
                           throw new Exception("合并代码失败:"+autoMergeRes+",请检查后再重试");
