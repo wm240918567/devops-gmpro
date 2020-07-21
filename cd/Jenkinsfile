@@ -1,82 +1,66 @@
 pipeline{
-      environment{
-        //IMAGE_NAME =  sh(returnStdout: true,script: 'echo `echo $git_origin_repo|cut -d / -f 3|cut -d . -f 1`').trim()
+    environment{
         IMAGE_NAME =  sh(returnStdout: true,script: 'echo $image_name').trim()
         IMAGE_TAG =  sh(returnStdout: true,script: 'echo $image_tag').trim()
         REPLICAS =  sh(returnStdout: true,script: 'echo $replicas').trim()
         IMAGE_ENV =  sh(returnStdout: true,script: 'echo $image_env').trim()
         HEALTH_PATH =  sh(returnStdout: true,script: 'echo $health_path').trim()
-        //PRO_NAME =  sh(returnStdout: true,script: 'echo $pro_name').trim()
-      }
+    }
 
-      agent{
+    agent{
         node{
-          label 'slave-pipeline'
+            label 'slave-pipeline'
         }
-      }
+    }
 
-      stages{
-
-        // stage('Git'){
-        //   steps{
-        //     git branch: 'master', credentialsId: '086da3b7-bb65-40c4-ae64-8b06770f7f3f', url: 'http://root:12345678@gitlab.haoyuanyiliao.com/ceshi/gmpro.git'
-        //   }
-        // }
-         //部署应用到Kubernetes集群
-         stage('Deploy'){
+    stages{
+        //部署应用到Kubernetes集群
+        stage('Deploy'){
             steps{
-
-
                 script{
-              container("kubectl") {
-                     echo "Building..${IMAGE_ENV}"
-                     //sleep 500
-                     //sh "sed -i 's/IMAGE_ENV/${IMAGE_ENV}/g' `pwd`/cd/deployment.yaml"
-                     echo "${JOB_NAME}"
-                     //sh "sleep 200"
-                     step([$class: 'KubernetesDeploy', authMethod: 'certs', apiServerUrl: 'https://kubernetes.default.svc.cluster.local:443', credentialsId:'k8sCertAuth', config: 'cd/deployment.yaml',variableState: 'IMAGE_TAG,IMAGE_NAME,REPLICAS,IMAGE_ENV,HEALTH_PATH'])
-                 for(i=1;i<=4;i++){
-                  sleep 20
-                  server_output = sh(returnStdout: true, script: 'timeout -t 10 kubectl rollout status deployment ${image_name}-${image_env}|| echo "error"')
-                  echo "server_output:${server_output}"
-                  if (server_output.contains("successfully")) {
-                      break
-                  }else{
-                  
-                      echo "重试中${i}"
-                  }
-                  }
-                 apply_output = sh(returnStdout: true, script: 'timeout -t 10 kubectl rollout status deployment ${image_name}-${image_env}|| echo "error"')
+                    container("kubectl") {
+                        echo "Building..${IMAGE_ENV}"
+                        //sleep 500
+                        //sh "sed -i 's/IMAGE_ENV/${IMAGE_ENV}/g' `pwd`/cd/deployment.yaml"
+                        echo "${JOB_NAME}"
+                        //sh "sleep 200"
+                        step([$class: 'KubernetesDeploy', authMethod: 'certs', apiServerUrl: 'https://kubernetes.default.svc.cluster.local:443', credentialsId:'k8sCertAuth', config: 'cd/deployment.yaml',variableState: 'IMAGE_TAG,IMAGE_NAME,REPLICAS,IMAGE_ENV,HEALTH_PATH'])
+                        for(i=1;i<=4;i++){
+                            sleep 20
+                            server_output = sh(returnStdout: true, script: 'timeout -t 10 kubectl rollout status deployment ${image_name}-${image_env}|| echo "error"')
+                            echo "server_output:${server_output}"
+                            if (server_output.contains("successfully")) {
+                                break       
+                            }else{
+                                echo "重试中${i}"
+                            }
+                        }
+                        apply_output = sh(returnStdout: true, script: 'timeout -t 10 kubectl rollout status deployment ${image_name}-${image_env}|| echo "error"')
                         if (apply_output.contains("successfully")) {
-                      emailext (
-                        mimeType: 'text/html',
-                        subject: """${image_name}_${image_tag}_${IMAGE_ENV}发布成功""",
-                        to: "$mail",
-                        body: """<p>SUCCESS: ${image_name}_${image_tag} :</p>
-                    <p>Check console output </a>"</p>""",
-                    )
+                            emailext (
+                                mimeType: 'text/html',
+                                subject: """${image_name}_${image_tag}_${IMAGE_ENV}发布成功""",
+                                to: "$mail",
+                                body: """<p>SUCCESS: ${image_name}_${image_tag} :</p>
+                                    <p>Check console output </a>"</p>""",
+                            )
                         } else {
                             echo "error"
-                           rollback_output = sh(returnStdout: true, script: "kubectl rollout undo deployment ${IMAGE_NAME}-${IMAGE_ENV}")
+                            rollback_output = sh(returnStdout: true, script: "kubectl rollout undo deployment ${IMAGE_NAME}-${IMAGE_ENV}")
                             echo "应用已回滚"
                             echo rollback_output
-                    emailext (
-                        mimeType: 'text/html',
-                        subject: """${image_name}_${image_tag}_${IMAGE_ENV}发布失败，已回滚""",
-                        to: "$mail",
-                        body: """<p>发布失败: ${image_name}_${image_tag} :</p>
-                    <p>Check console output </a>"</p>""",
-                    )
-                    throw new Exception("发布失败，已回滚");
-        
+                            emailext (
+                                mimeType: 'text/html',
+                                subject: """${image_name}_${image_tag}_${IMAGE_ENV}发布失败，已回滚""",
+                                to: "$mail",
+                                body: """<p>发布失败: ${image_name}_${image_tag} :</p>
+                            <p>Check console output </a>"</p>""",
+                            )
+                            throw new Exception("发布失败，已回滚");
                         }
-                 }
-             }
-          }
-
-
-}
-
-
-      }
+                    }
+                }
+            }
+        }
     }
+}
