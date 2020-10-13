@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: ${IMAGE_NAME}-${IMAGE_ENV}
-        image: registry-vpc.cn-beijing.aliyuncs.com/jiajiakang/${IMAGE_NAME}:${IMAGE_TAG}
+        image: registry.cn-beijing.aliyuncs.com/jiajiakang/${IMAGE_NAME}:${IMAGE_TAG}
         imagePullPolicy: Always
         livenessProbe:
           failureThreshold: 3
